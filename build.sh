@@ -19,5 +19,8 @@ for target in linux/amd64 linux/arm64 windows/amd64 windows/arm64; do
   CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath -tags "$TAGS" -ldflags "$LDFLAGS" -o "dist/$out" .
   echo "dist/$out"
 done
+# The sing-box app on phones reads the dpi profile from each release.
+go run -tags "$TAGS" -ldflags "-checklinkname=0" . __phone-dpi > dist/rabbithole-dpi.json
+echo "dist/rabbithole-dpi.json"
 (cd dist && sha256sum rabbithole-* > checksums.txt)
 echo "dist/checksums.txt ($VERSION)"

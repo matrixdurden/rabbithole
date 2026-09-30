@@ -25,6 +25,7 @@ client (Windows, Linux):
   rabbithole dpi               no server: your own connection, past DPI blocks
   rabbithole off               back to the normal connection
   rabbithole autostart on|off  at boot, come back as left (on waits for the server)
+  rabbithole phone [LINK]      both modes on a phone, in the sing-box app
   rabbithole                   show status
 
   rabbithole doctor            test this network and say which mode works (report saved)
@@ -92,6 +93,8 @@ func main() {
 		err = cmdDoctor()
 	case "autostart":
 		err = cmdAutostart(args)
+	case "phone":
+		err = cmdPhone(args)
 	case "version", "--version", "-v":
 		fmt.Println(version)
 	case "help", "--help", "-h":
@@ -103,6 +106,8 @@ func main() {
 		err = runClientService()
 	case "__admin":
 		err = runAdminChild(args)
+	case "__phone-dpi": // build.sh publishes its output with each release
+		err = printDPIProfile()
 	default:
 		usage()
 		os.Exit(2)

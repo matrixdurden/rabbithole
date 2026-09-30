@@ -198,7 +198,7 @@ func newServer(port int) *ServerState {
 	}
 }
 
-// ownerName is the account that ran `sudo rabbithole server`; clients use it for ssh.
+// ownerName is the account that ran `sudo rabbithole server`; its link is named after it.
 func ownerName() string {
 	name := os.Getenv("SUDO_USER")
 	if name == "" {
@@ -471,6 +471,8 @@ func printLink(l Link) {
 	fmt.Printf("  %sWindows%s  in PowerShell, then paste the link when asked:\n", cBold, cReset)
 	fmt.Printf("           irm %s/install.ps1 | iex\n\n", scripts)
 	fmt.Printf("  %sLinux%s    curl -fsSL %s/install.sh | sh -s -- client '%s'\n\n", cBold, cReset, scripts, l)
+	fmt.Printf("  %sPhone%s    Hiddify and v2rayNG take the link as it is; for the sing-box app:\n", cBold, cReset)
+	fmt.Printf("           rabbithole phone '%s'\n\n", l)
 }
 
 // serverStatus needs no root: the state file is private, the unit is not.

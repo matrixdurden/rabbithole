@@ -389,16 +389,19 @@ func saveReport(text string) string {
 	if err != nil {
 		return ""
 	}
-	dir := home
-	for _, d := range []string{filepath.Join(home, "Desktop"), filepath.Join(home, "OneDrive", "Desktop"), filepath.Join(home, "OneDrive", "Masaüstü")} {
-		if fi, err := os.Stat(d); err == nil && fi.IsDir() {
-			dir = d
-			break
-		}
-	}
-	path := filepath.Join(dir, "rabbithole-doctor-"+time.Now().Format("20060102-1504")+".txt")
+	path := filepath.Join(desktopDir(home), "rabbithole-doctor-"+time.Now().Format("20060102-1504")+".txt")
 	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
 		return ""
 	}
 	return path
+}
+
+// desktopDir is the user's desktop, or home when there is none.
+func desktopDir(home string) string {
+	for _, d := range []string{filepath.Join(home, "Desktop"), filepath.Join(home, "OneDrive", "Desktop"), filepath.Join(home, "OneDrive", "Masaüstü")} {
+		if fi, err := os.Stat(d); err == nil && fi.IsDir() {
+			return d
+		}
+	}
+	return home
 }

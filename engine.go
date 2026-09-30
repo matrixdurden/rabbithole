@@ -238,15 +238,6 @@ func newBox(ctx context.Context, cfg obj) (*box.Box, error) {
 	return box.New(box.Options{Context: ctx, Options: opts})
 }
 
-// checkConfig validates cfg without starting anything.
-func checkConfig(cfg obj) error {
-	b, err := newBox(context.Background(), cfg)
-	if err != nil {
-		return err
-	}
-	return b.Close()
-}
-
 func startBox(ctx context.Context, cfg obj) (*box.Box, error) {
 	b, err := newBox(ctx, cfg)
 	if err != nil {

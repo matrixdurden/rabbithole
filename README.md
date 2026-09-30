@@ -59,6 +59,20 @@ curl -fsSL https://raw.githubusercontent.com/matrixdurden/rabbithole/main/instal
 
 A link is checked before anything is changed. Windows asks for administrator permission once; you can add a link later with `rabbithole client`.
 
+### 3. Phones
+
+Phones run both modes in the official [sing-box](https://sing-box.sagernet.org/clients/) app (App Store, Google Play), each as a profile: the one you start is the mode.
+
+| Mode | How |
+| --- | --- |
+| **dpi** | In sing-box, add a remote profile with `https://github.com/matrixdurden/rabbithole/releases/latest/download/rabbithole-dpi.json`, or run `rabbithole phone` on a computer and scan the QR code it shows with the phone's camera. The app keeps the profile up to date. |
+| **on** | `rabbithole phone` on a computer that has a link, or `rabbithole phone 'vless://…'` anywhere, puts a `.bpf` file on the desktop. Send it to the phone and open it with sing-box. |
+
+> [!CAUTION]
+> The `.bpf` file holds the key to the server, so send it only to yourself.
+
+Hiddify and v2rayNG take the `vless://` link as it is, too.
+
 ## Use
 
 ```sh
@@ -90,7 +104,7 @@ sudo rabbithole users
 sudo rabbithole link ali    # prints ali's link again
 ```
 
-The link is a standard `vless://` link, so phone apps such as Hiddify or v2rayNG accept it too.
+The link is a standard `vless://` link, so phone apps such as Hiddify or v2rayNG accept it too; for the sing-box app see [Phones](#3-phones).
 
 ## Update
 

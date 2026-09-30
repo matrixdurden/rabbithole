@@ -16,8 +16,7 @@ import (
 
 // A client owns (see sys_*.go for the exact paths): the installed binary, a
 // stopped-by-default system service that runs `rabbithole service`, the mode it
-// last ran in, and, once a server link was given, client.json with the link
-// and a marked Host block in the user's ~/.ssh/config.
+// last ran in, and, once a server link was given, client.json with the link.
 //
 // The service runs in one of two modes:
 //   server  all traffic goes through the server (rabbithole on)

@@ -6,10 +6,13 @@ require (
 	github.com/sagernet/sing v0.9.6-0.20260922013354-87c33f17688f
 	github.com/sagernet/sing-box v1.14.2
 	golang.org/x/sys v0.48.0
+	rsc.io/qr v0.2.0
 )
 
 require (
+	filippo.io/age v1.3.1 // indirect
 	filippo.io/edwards25519 v1.2.0 // indirect
+	filippo.io/hpke v0.4.0 // indirect
 	github.com/RyuaNerin/go-krypto v1.3.0 // indirect
 	github.com/ajg/form v1.5.1 // indirect
 	github.com/akutz/memconn v0.1.0 // indirect

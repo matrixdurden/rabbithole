@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -11,6 +12,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/sagernet/sing-box/experimental/libbox"
 )
 
 func TestLinkRoundTrip(t *testing.T) {
@@ -69,6 +72,15 @@ func TestRealityPublicKey(t *testing.T) {
 	}
 }
 
+// checkConfig validates cfg without starting anything.
+func checkConfig(cfg obj) error {
+	b, err := newBox(context.Background(), cfg)
+	if err != nil {
+		return err
+	}
+	return b.Close()
+}
+
 func TestClientConfigParses(t *testing.T) {
 	_, pub := newRealityKeys()
 	l := Link{UUID: newUUID(), Host: "203.0.113.7", Port: 443, SNI: "dl.google.com", PublicKey: pub, ShortID: "ab"}
@@ -86,6 +98,40 @@ func TestClientConfigParses(t *testing.T) {
 		if err := checkConfig(dpiConfig(socks, "", "1.1.1.1")); err != nil {
 			t.Errorf("dpi socks=%d: %v", socks, err)
 		}
+	}
+}
+
+func TestPhoneProfiles(t *testing.T) {
+	if err := checkConfig(phoneDPIConfig()); err != nil {
+		t.Errorf("dpi: %v", err)
+	}
+	_, pub := newRealityKeys()
+	l := Link{UUID: newUUID(), Host: "203.0.113.7", Port: 443, SNI: "dl.google.com", PublicKey: pub, ShortID: "ab", Name: "ali"}
+	cfg := phoneServerConfig(l)
+	if err := checkConfig(cfg); err != nil {
+		t.Errorf("server: %v", err)
+	}
+
+	// The sing-box app must read the file back as the same profile.
+	data, err := profileFile("rabbithole on", cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := libbox.DecodeProfileContent(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Name != "rabbithole on" || p.Type != libbox.ProfileTypeLocal || !strings.Contains(p.Config, l.UUID) {
+		t.Fatalf("%+v", p)
+	}
+	var back obj
+	if err := json.Unmarshal([]byte(p.Config), &back); err != nil || checkConfig(back) != nil {
+		t.Fatalf("config did not survive: %v", err)
+	}
+
+	imp, err := libbox.ParseRemoteProfileImportLink(dpiImportLink())
+	if err != nil || imp.URL != dpiProfileURL || imp.Name != "rabbithole dpi" {
+		t.Fatalf("import link: %+v %v", imp, err)
 	}
 }
 
