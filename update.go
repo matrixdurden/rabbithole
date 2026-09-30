@@ -17,10 +17,10 @@ import (
 	"time"
 )
 
-// tunel update replaces the installed binary with the latest release and
+// rabbithole update replaces the installed binary with the latest release and
 // restarts what was running. Keys, users and the link stay as they are.
 
-const releases = "https://github.com/matrixdurden/tunel/releases"
+const releases = "https://github.com/matrixdurden/rabbithole/releases"
 
 var tagRe = regexp.MustCompile(`^v\d+\.\d+\.\d+$`)
 
@@ -31,7 +31,10 @@ func serverInstalled() bool {
 
 func cmdUpdate() error {
 	if !serviceExists() && !serverInstalled() {
-		return fmt.Errorf("tunel is not set up on this computer; see %s", "https://github.com/matrixdurden/tunel")
+		if legacyServerInstalled() || legacyClientInstalled() {
+			return cmdAdopt() // this binary is already the latest
+		}
+		return fmt.Errorf("rabbithole is not set up on this computer; see %s", "https://github.com/matrixdurden/rabbithole")
 	}
 	latest, err := latestTag()
 	if err != nil {
@@ -43,12 +46,12 @@ func cmdUpdate() error {
 		return nil
 	}
 
-	tmp, err := os.MkdirTemp("", "tunel-update-")
+	tmp, err := os.MkdirTemp("", "rabbithole-update-")
 	if err != nil {
 		return err
 	}
 	defer os.RemoveAll(tmp)
-	asset := "tunel-" + runtime.GOOS + "-" + runtime.GOARCH
+	asset := "rabbithole-" + runtime.GOOS + "-" + runtime.GOARCH
 	if runtime.GOOS == "windows" {
 		asset += ".exe"
 	}
@@ -72,7 +75,7 @@ func cmdUpdate() error {
 	ok("downloaded %s", latest)
 	if serverInstalled() {
 		fmt.Printf("  %sthe server restarts: connections through it drop for a moment, this SSH\n", cDim)
-		fmt.Printf("  session too if it runs through the tunnel. Reconnect and run tunel to check.%s\n", cReset)
+		fmt.Printf("  session too if it runs through the tunnel. Reconnect and run rabbithole to check.%s\n", cReset)
 	}
 
 	if err := asAdmin("upgrade", file, want); err != nil {

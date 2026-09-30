@@ -21,9 +21,9 @@ func waitGone(t *testing.T, p string) {
 
 // The folder name has a space, like "Program Files".
 func TestDeleteLaterFolder(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "tunel test")
+	dir := filepath.Join(t.TempDir(), "rabbithole test")
 	os.MkdirAll(dir, 0o755)
-	os.WriteFile(filepath.Join(dir, "tunel.exe"), []byte("x"), 0o644)
+	os.WriteFile(filepath.Join(dir, "rabbithole.exe"), []byte("x"), 0o644)
 	if err := deleteLater(dir); err != nil {
 		t.Fatal(err)
 	}
@@ -32,8 +32,8 @@ func TestDeleteLaterFolder(t *testing.T) {
 
 // A running .exe can be replaced; the old copy goes once it exits.
 func TestInstallFileOverRunningExe(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "tunel test")
-	dst := filepath.Join(dir, "tunel.exe")
+	dir := filepath.Join(t.TempDir(), "rabbithole test")
+	dst := filepath.Join(dir, "rabbithole.exe")
 	ping, _ := exec.LookPath("ping.exe")
 	if err := installFile(ping, dst); err != nil {
 		t.Fatal(err)

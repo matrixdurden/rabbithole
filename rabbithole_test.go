@@ -56,7 +56,7 @@ func TestParseLinkRejects(t *testing.T) {
 			t.Errorf("%s: accepted %s", name, s)
 		}
 	}
-	if l, err := ParseLink(good); err != nil || l.Name != "tunel" {
+	if l, err := ParseLink(good); err != nil || l.Name != "rabbithole" {
 		t.Errorf("defaults: %+v %v", l, err)
 	}
 }
@@ -168,13 +168,13 @@ func TestEndToEnd(t *testing.T) {
 
 func TestChecksumFor(t *testing.T) {
 	sums := filepath.Join(t.TempDir(), "checksums.txt")
-	os.WriteFile(sums, []byte("AA11  tunel-linux-amd64\nbb22 *tunel-windows-amd64.exe\n"), 0o644)
-	for asset, want := range map[string]string{"tunel-linux-amd64": "aa11", "tunel-windows-amd64.exe": "bb22"} {
+	os.WriteFile(sums, []byte("AA11  rabbithole-linux-amd64\nbb22 *rabbithole-windows-amd64.exe\n"), 0o644)
+	for asset, want := range map[string]string{"rabbithole-linux-amd64": "aa11", "rabbithole-windows-amd64.exe": "bb22"} {
 		if got, err := checksumFor(sums, asset); err != nil || got != want {
 			t.Errorf("%s: %q %v", asset, got, err)
 		}
 	}
-	if _, err := checksumFor(sums, "tunel-linux-arm64"); err == nil {
+	if _, err := checksumFor(sums, "rabbithole-linux-arm64"); err == nil {
 		t.Error("missing asset accepted")
 	}
 }

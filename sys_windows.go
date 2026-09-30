@@ -23,27 +23,27 @@ import (
 )
 
 // On Windows a client owns:
-//   C:\Program Files\tunel\tunel.exe   this binary (on the system PATH)
-//   C:\ProgramData\tunel\              client.json, tunel.log
-//   the "tunel" service                manual start; any signed-in user may start/stop it
-//   the "tunel" Wintun adapter         exists only while the tunnel is on
-//   the Wintun driver                  only if tunel was the one that installed it
+//   C:\Program Files\rabbithole\rabbithole.exe   this binary (on the system PATH)
+//   C:\ProgramData\rabbithole\              client.json, rabbithole.log
+//   the "rabbithole" service                manual start; any signed-in user may start/stop it
+//   the "rabbithole" Wintun adapter         exists only while the tunnel is on
+//   the Wintun driver                  only if rabbithole was the one that installed it
 
 const (
 	isLinux = false
-	svcName = "tunel"
+	svcName = "rabbithole"
 )
 
 var (
-	installDir      = filepath.Join(os.Getenv("ProgramFiles"), "tunel")
-	installedBin    = filepath.Join(installDir, "tunel.exe")
-	dataDir         = filepath.Join(os.Getenv("ProgramData"), "tunel")
+	installDir      = filepath.Join(os.Getenv("ProgramFiles"), "rabbithole")
+	installedBin    = filepath.Join(installDir, "rabbithole.exe")
+	dataDir         = filepath.Join(os.Getenv("ProgramData"), "rabbithole")
 	clientStatePath = filepath.Join(dataDir, "client.json")
-	clientLogPath   = filepath.Join(dataDir, "tunel.log")
+	clientLogPath   = filepath.Join(dataDir, "rabbithole.log")
 	clientLogHint   = clientLogPath
 	clientModePath  = filepath.Join(dataDir, "mode") // written by the service
-	offFlagPath     = filepath.Join(dataDir, "off")  // tunel off was the last word; autostart keeps it off
-	wintunMarker    = filepath.Join(dataDir, "wintun-installed-by-tunel")
+	offFlagPath     = filepath.Join(dataDir, "off")  // rabbithole off was the last word; autostart keeps it off
+	wintunMarker    = filepath.Join(dataDir, "wintun-installed-by-rabbithole")
 )
 
 var (
@@ -72,7 +72,7 @@ func setupConsole() {
 }
 
 // ownConsole reports whether Windows made a console just for us, which is
-// what happens when tunel.exe is double-clicked.
+// what happens when rabbithole.exe is double-clicked.
 func ownConsole() bool {
 	var pids [2]uint32
 	n, _, _ := procGetConsolePIDs.Call(uintptr(unsafe.Pointer(&pids[0])), 2)
@@ -115,7 +115,7 @@ func runElevated(args []string) error {
 	if err != nil {
 		return err
 	}
-	f, err := os.CreateTemp("", "tunel-*.log")
+	f, err := os.CreateTemp("", "rabbithole-*.log")
 	if err != nil {
 		return err
 	}
@@ -224,8 +224,8 @@ func installClient() error {
 		return err
 	}
 	if _, err := os.Stat(wintunMarker); err != nil && !serviceExists() && len(wintunDrivers()) == 0 {
-		// The driver is not there yet, so the first `tunel on` installs it and
-		// `tunel remove` may take it away again.
+		// The driver is not there yet, so the first `rabbithole on` installs it and
+		// `rabbithole remove` may take it away again.
 		os.WriteFile(wintunMarker, nil, 0o644)
 	}
 
@@ -239,7 +239,7 @@ func installClient() error {
 	if err == nil {
 		cfg, err := s.Config()
 		if err == nil {
-			cfg.BinaryPathName = binPath // the start type stays: it is tunel autostart's
+			cfg.BinaryPathName = binPath // the start type stays: it is rabbithole autostart's
 			err = s.UpdateConfig(cfg)
 		}
 		if err != nil {
@@ -248,8 +248,8 @@ func installClient() error {
 		}
 	} else {
 		s, err = m.CreateService(svcName, installedBin, mgr.Config{
-			DisplayName:  "tunel",
-			Description:  "Sends this computer's traffic through your tunel server. Use: tunel on / tunel off",
+			DisplayName:  "rabbithole",
+			Description:  "Sends this computer's traffic through your rabbithole server. Use: rabbithole on / rabbithole off",
 			StartType:    mgr.StartManual,
 			ErrorControl: mgr.ErrorNormal,
 		}, "service")
@@ -278,10 +278,10 @@ func installClient() error {
 		return err
 	}
 
-	if added, err := editSystemPath(true); err != nil {
+	if added, err := editSystemPath(installDir, true); err != nil {
 		bad("PATH: %v", err)
 	} else if added {
-		ok("added %s to PATH (new terminals can run tunel from anywhere)", installDir)
+		ok("added %s to PATH (new terminals can run rabbithole from anywhere)", installDir)
 	}
 	return nil
 }
@@ -299,26 +299,26 @@ func uninstallClient() error {
 		time.Sleep(200 * time.Millisecond)
 	}
 	if serviceExists() {
-		return fmt.Errorf("the tunel service could not be deleted; restart Windows and run tunel remove again")
+		return fmt.Errorf("the rabbithole service could not be deleted; restart Windows and run rabbithole remove again")
 	}
 
-	removeAdapter()
+	removeAdapter(tunName)
 	if _, err := os.Stat(wintunMarker); err == nil {
 		for _, inf := range wintunDrivers() {
 			// Without /force pnputil refuses if another program's adapter still uses it.
 			exec.Command("pnputil", "/delete-driver", inf).Run()
 		}
 	}
-	if _, err := editSystemPath(false); err != nil {
+	if _, err := editSystemPath(installDir, false); err != nil {
 		bad("PATH: %v", err)
 	}
 	return os.RemoveAll(dataDir)
 }
 
-// removeAdapter deletes the tunel adapter if a crash left it behind.
+// removeAdapter deletes the named tunnel adapter if a crash left it behind.
 // Normally it disappears together with the tunnel.
-func removeAdapter() {
-	ps := `$a = Get-NetAdapter -Name 'tunel' -IncludeHidden -ErrorAction SilentlyContinue; ` +
+func removeAdapter(name string) {
+	ps := `$a = Get-NetAdapter -Name '` + name + `' -IncludeHidden -ErrorAction SilentlyContinue; ` +
 		`if ($a) { pnputil /remove-device $a.PnPDeviceID | Out-Null }`
 	exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", ps).Run()
 }
@@ -375,9 +375,9 @@ func deleteLater(p string) error {
 
 const envKey = `SYSTEM\CurrentControlSet\Control\Session Manager\Environment`
 
-// editSystemPath adds or removes installDir in the machine PATH and reports
-// whether it changed anything.
-func editSystemPath(add bool) (bool, error) {
+// editSystemPath adds or removes dir in the machine PATH and reports whether
+// it changed anything.
+func editSystemPath(dir string, add bool) (bool, error) {
 	k, err := registry.OpenKey(registry.LOCAL_MACHINE, envKey, registry.QUERY_VALUE|registry.SET_VALUE)
 	if err != nil {
 		return false, err
@@ -390,7 +390,7 @@ func editSystemPath(add bool) (bool, error) {
 	var parts []string
 	has := false
 	for _, p := range strings.Split(cur, ";") {
-		if strings.EqualFold(strings.TrimRight(p, `\`), installDir) {
+		if strings.EqualFold(strings.TrimRight(p, `\`), dir) {
 			has = true
 			continue
 		}
@@ -402,7 +402,7 @@ func editSystemPath(add bool) (bool, error) {
 		return false, nil
 	}
 	if add {
-		parts = append(parts, installDir)
+		parts = append(parts, dir)
 	}
 	if err := k.SetExpandStringValue("Path", strings.Join(parts, ";")); err != nil {
 		return false, err
@@ -418,16 +418,20 @@ func editSystemPath(add bool) (bool, error) {
 // ---------- service control (no admin needed) ----------
 
 func openService(access uint32) (*mgr.Service, func(), error) {
+	return openNamedService(svcName, access)
+}
+
+func openNamedService(name string, access uint32) (*mgr.Service, func(), error) {
 	scm, err := windows.OpenSCManager(nil, nil, windows.SC_MANAGER_CONNECT)
 	if err != nil {
 		return nil, nil, err
 	}
-	h, err := windows.OpenService(scm, windows.StringToUTF16Ptr(svcName), access)
+	h, err := windows.OpenService(scm, windows.StringToUTF16Ptr(name), access)
 	if err != nil {
 		windows.CloseServiceHandle(scm)
 		return nil, nil, err
 	}
-	s := &mgr.Service{Name: svcName, Handle: h}
+	s := &mgr.Service{Name: name, Handle: h}
 	return s, func() { s.Close(); windows.CloseServiceHandle(scm) }, nil
 }
 
@@ -488,7 +492,7 @@ func svcStart(mode string) error {
 	}
 	s, done, err := openService(windows.SERVICE_START | windows.SERVICE_QUERY_STATUS)
 	if err != nil {
-		return fmt.Errorf("the tunel service is missing; run: tunel client")
+		return fmt.Errorf("the rabbithole service is missing; run: rabbithole client")
 	}
 	defer done()
 	if err := s.Start(mode); err != nil && !errors.Is(err, windows.ERROR_SERVICE_ALREADY_RUNNING) {
@@ -557,7 +561,7 @@ func setAutostart(on bool) error {
 	defer m.Disconnect()
 	s, err := m.OpenService(svcName)
 	if err != nil {
-		return fmt.Errorf("the tunel service is missing; run: tunel client")
+		return fmt.Errorf("the rabbithole service is missing; run: rabbithole client")
 	}
 	defer s.Close()
 	cfg, err := s.Config()
@@ -604,7 +608,7 @@ func conflictingPrograms() []string {
 
 func runClientService() error {
 	if is, _ := svc.IsWindowsService(); !is {
-		return fmt.Errorf("this is started by the tunel service; use: tunel on")
+		return fmt.Errorf("this is started by the rabbithole service; use: rabbithole on")
 	}
 	return svc.Run(svcName, winService{})
 }
@@ -613,7 +617,7 @@ type winService struct{}
 
 func (winService) Execute(args []string, req <-chan svc.ChangeRequest, st chan<- svc.Status) (bool, uint32) {
 	st <- svc.Status{State: svc.StartPending, WaitHint: 10000}
-	// args[0] is the service name. tunel on/dpi add the mode; a start at boot
+	// args[0] is the service name. rabbithole on/dpi add the mode; a start at boot
 	// (autostart) or after a crash brings none: then the last mode is used,
 	// unless the user turned the tunnel off.
 	mode := currentMode()
@@ -622,12 +626,12 @@ func (winService) Execute(args []string, req <-chan svc.ChangeRequest, st chan<-
 		mode = args[1]
 		os.Remove(offFlagPath)
 	} else if _, err := os.Stat(offFlagPath); err == nil {
-		os.WriteFile(clientLogPath, []byte("tunel: turned off before; staying off\n"), 0o644)
+		os.WriteFile(clientLogPath, []byte("rabbithole: turned off before; staying off\n"), 0o644)
 		return false, 0
 	}
 	os.WriteFile(clientModePath, []byte(mode+"\n"), 0o644)
 
-	// Bring the tunnel up in the background, so tunel off (a Stop) can end a
+	// Bring the tunnel up in the background, so rabbithole off (a Stop) can end a
 	// start that is still waiting for the network or the server.
 	const accepts = svc.AcceptStop | svc.AcceptShutdown
 	var check uint32
@@ -655,7 +659,7 @@ func (winService) Execute(args []string, req <-chan svc.ChangeRequest, st chan<-
 			case errors.Is(r.err, errServerDown), errors.Is(r.err, context.Canceled):
 				return false, 0 // stopped on purpose, not a failure to recover from
 			case r.err != nil:
-				appendLog(clientLogPath, "tunel: "+r.err.Error())
+				appendLog(clientLogPath, "rabbithole: "+r.err.Error())
 				return true, 1
 			}
 			b = r.b
@@ -683,7 +687,7 @@ func (winService) Execute(args []string, req <-chan svc.ChangeRequest, st chan<-
 			st <- c.CurrentStatus
 		case svc.Stop, svc.Shutdown:
 			if c.Cmd == svc.Stop {
-				// tunel off (or a pause that turns it back on right after). A
+				// rabbithole off (or a pause that turns it back on right after). A
 				// shutdown is not a choice to turn it off, so it leaves no mark.
 				os.WriteFile(offFlagPath, nil, 0o644)
 			}

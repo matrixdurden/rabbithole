@@ -1,4 +1,4 @@
-module github.com/matrixdurden/tunel
+module github.com/matrixdurden/rabbithole
 
 go 1.27.1
 

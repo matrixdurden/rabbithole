@@ -1,5 +1,5 @@
 #!/bin/sh
-# Builds tunel for every supported platform into dist/, with checksums.txt.
+# Builds rabbithole for every supported platform into dist/, with checksums.txt.
 set -eu
 cd "$(dirname "$0")"
 
@@ -12,10 +12,10 @@ mkdir -p dist
 for target in linux/amd64 linux/arm64 windows/amd64 windows/arm64; do
   os=${target%/*}
   arch=${target#*/}
-  out=tunel-$os-$arch
+  out=rabbithole-$os-$arch
   [ "$os" = windows ] && out=$out.exe
   CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath -tags "$TAGS" -ldflags "$LDFLAGS" -o "dist/$out" .
   echo "dist/$out"
 done
-(cd dist && sha256sum tunel-* > checksums.txt)
+(cd dist && sha256sum rabbithole-* > checksums.txt)
 echo "dist/checksums.txt ($VERSION)"

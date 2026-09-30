@@ -23,15 +23,15 @@ import (
 )
 
 // The server is a Linux machine with systemd. Everything it owns:
-//   /etc/tunel/server.json                     keys and users
-//   /etc/systemd/system/tunel-server.service   runs `tunel serve`
-//   /usr/local/bin/tunel                       this binary
+//   /etc/rabbithole/server.json                     keys and users
+//   /etc/systemd/system/rabbithole-server.service   runs `rabbithole serve`
+//   /usr/local/bin/rabbithole                       this binary
 
 const (
-	serverStatePath = "/etc/tunel/server.json"
-	serverUnitPath  = "/etc/systemd/system/tunel-server.service"
-	serverUnit      = "tunel-server"
-	linuxBin        = "/usr/local/bin/tunel"
+	serverStatePath = "/etc/rabbithole/server.json"
+	serverUnitPath  = "/etc/systemd/system/rabbithole-server.service"
+	serverUnit      = "rabbithole-server"
+	linuxBin        = "/usr/local/bin/rabbithole"
 	oldXrayConfig   = "/usr/local/etc/xray/config.json"
 )
 
@@ -97,7 +97,7 @@ func requireLinuxServer() error {
 	return nil
 }
 
-// ---------- tunel server ----------
+// ---------- rabbithole server ----------
 
 func adminServer(args []string) error {
 	if err := requireLinuxServer(); err != nil {
@@ -118,10 +118,11 @@ func adminServer(args []string) error {
 		return err
 	}
 	if fresh {
-		if s, err = importOldXray(); err != nil {
+		if s = legacyServerState(); s != nil {
+			ok("took over the keys and users of the tunel server; existing links keep working")
+		} else if s, err = importOldXray(); err != nil {
 			return err
-		}
-		if s != nil {
+		} else if s != nil {
 			ok("imported the keys of the old xray server; existing links keep working")
 		} else {
 			s = newServer(port)
@@ -137,6 +138,7 @@ func adminServer(args []string) error {
 	if err := s.save(); err != nil {
 		return err
 	}
+	removeLegacyServer()
 	if err := writeFileAtomic(serverUnitPath, []byte(serverUnitFile), 0o644); err != nil {
 		return err
 	}
@@ -149,7 +151,7 @@ func adminServer(args []string) error {
 	if err := restartServer(); err != nil {
 		return err
 	}
-	ok("tunel %s :%d", version, s.Port)
+	ok("rabbithole %s :%d", version, s.Port)
 
 	ip, err := s.selfTest()
 	if err != nil {
@@ -184,7 +186,7 @@ func adminServer(args []string) error {
 	}
 
 	printLink(s.link(s.Users[0]))
-	fmt.Printf("  %susers: %s · more: sudo tunel add NAME%s\n\n", cDim, userNames(s), cReset)
+	fmt.Printf("  %susers: %s · more: sudo rabbithole add NAME%s\n\n", cDim, userNames(s), cReset)
 	return nil
 }
 
@@ -196,7 +198,7 @@ func newServer(port int) *ServerState {
 	}
 }
 
-// ownerName is the account that ran `sudo tunel server`; clients use it for ssh.
+// ownerName is the account that ran `sudo rabbithole server`; clients use it for ssh.
 func ownerName() string {
 	name := os.Getenv("SUDO_USER")
 	if name == "" {
@@ -256,20 +258,20 @@ func importOldXray() (*ServerState, error) {
 		}
 		s.Users = append(s.Users, User{Name: name, UUID: cl.ID})
 	}
-	// Free the port. xray stays installed; `tunel` never deletes what it did not create.
+	// Free the port. xray stays installed; `rabbithole` never deletes what it did not create.
 	if exec.Command("systemctl", "disable", "--now", "xray").Run() == nil {
-		ok("stopped and disabled xray.service (it stays installed; tunel does not delete what it did not create)")
+		ok("stopped and disabled xray.service (it stays installed; rabbithole does not delete what it did not create)")
 	}
 	return s, nil
 }
 
 const serverUnitFile = `[Unit]
-Description=tunel server
+Description=rabbithole server
 After=network-online.target
 Wants=network-online.target
 
 [Service]
-ExecStart=/usr/local/bin/tunel serve
+ExecStart=/usr/local/bin/rabbithole serve
 Restart=on-failure
 RestartSec=3
 LimitNOFILE=1048576
@@ -335,7 +337,7 @@ func publicIP(hc *http.Client) (string, error) {
 	return ip.String(), nil
 }
 
-// runServer is what tunel-server.service executes.
+// runServer is what rabbithole-server.service executes.
 func runServer() error {
 	s, err := loadServer()
 	if err != nil {
@@ -357,7 +359,7 @@ func loadServerForAdmin() (*ServerState, error) {
 	}
 	s, err := loadServer()
 	if errors.Is(err, os.ErrNotExist) {
-		return nil, fmt.Errorf("this machine is not a server yet; run: tunel server")
+		return nil, fmt.Errorf("this machine is not a server yet; run: rabbithole server")
 	}
 	return s, err
 }
@@ -379,7 +381,7 @@ func adminAdd(args []string) error {
 		return err
 	}
 	if s.user(name) != nil {
-		return fmt.Errorf("%s already exists; tunel link %s shows the link", name, name)
+		return fmt.Errorf("%s already exists; rabbithole link %s shows the link", name, name)
 	}
 	s.Users = append(s.Users, User{Name: name, UUID: newUUID()})
 	if err := s.save(); err != nil {
@@ -406,7 +408,7 @@ func adminDel(args []string) error {
 		return fmt.Errorf("no user %s", name)
 	}
 	if len(s.Users) == 1 {
-		return fmt.Errorf("%s is the last user; tunel remove removes the server", name)
+		return fmt.Errorf("%s is the last user; rabbithole remove removes the server", name)
 	}
 	kept := s.Users[:0]
 	for _, u := range s.Users {
@@ -461,7 +463,7 @@ func userNames(s *ServerState) string {
 	return strings.Join(names, ", ")
 }
 
-const scripts = "https://raw.githubusercontent.com/matrixdurden/tunel/main"
+const scripts = "https://raw.githubusercontent.com/matrixdurden/rabbithole/main"
 
 func printLink(l Link) {
 	fmt.Printf("\n  %sLink for %s:%s\n\n  %s\n\n", cBold, l.Name, cReset, l)
@@ -478,7 +480,7 @@ func serverStatus() error {
 	} else {
 		fmt.Printf("%s○%s server stopped%s  sudo systemctl start %s%s\n", cYellow, cReset, cDim, serverUnit, cReset)
 	}
-	fmt.Printf("%s  sudo tunel users · sudo tunel add NAME · sudo tunel link NAME%s\n", cDim, cReset)
+	fmt.Printf("%s  sudo rabbithole users · sudo rabbithole add NAME · sudo rabbithole link NAME%s\n", cDim, cReset)
 	return nil
 }
 

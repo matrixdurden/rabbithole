@@ -14,33 +14,33 @@ import (
 )
 
 // On Linux a client owns:
-//   /usr/local/bin/tunel                this binary
-//   /etc/tunel/client.json              the link
-//   /etc/systemd/system/tunel.service   runs `tunel service`; enabled only by tunel autostart on
-//   /etc/tunel/mode, /etc/tunel/off     the last mode, and whether tunel off was the last word
-//   the "tunel" TUN device              exists only while the tunnel is on
+//   /usr/local/bin/rabbithole                this binary
+//   /etc/rabbithole/client.json              the link
+//   /etc/systemd/system/rabbithole.service   runs `rabbithole service`; enabled only by rabbithole autostart on
+//   /etc/rabbithole/mode, /etc/rabbithole/off     the last mode, and whether rabbithole off was the last word
+//   the "rabbithole" TUN device              exists only while the tunnel is on
 
 const (
 	isLinux         = true
 	installedBin    = linuxBin
-	clientStatePath = "/etc/tunel/client.json"
-	clientModePath  = "/etc/tunel/mode"
-	offFlagPath     = "/etc/tunel/off"
-	clientUnitPath  = "/etc/systemd/system/tunel.service"
-	clientUnit      = "tunel"
-	clientLogHint   = "journalctl -u tunel"
-	// Marks a start by tunel on/dpi. /run is emptied at boot, so a start at
+	clientStatePath = "/etc/rabbithole/client.json"
+	clientModePath  = "/etc/rabbithole/mode"
+	offFlagPath     = "/etc/rabbithole/off"
+	clientUnitPath  = "/etc/systemd/system/rabbithole.service"
+	clientUnit      = "rabbithole"
+	clientLogHint   = "journalctl -u rabbithole"
+	// Marks a start by rabbithole on/dpi. /run is emptied at boot, so a start at
 	// boot never sees it.
-	explicitMark = "/run/tunel-explicit-start"
+	explicitMark = "/run/rabbithole-explicit-start"
 )
 
 const clientUnitFile = `[Unit]
-Description=tunel client
+Description=rabbithole client
 After=network-online.target
 Wants=network-online.target
 
 [Service]
-ExecStart=/usr/local/bin/tunel service
+ExecStart=/usr/local/bin/rabbithole service
 Restart=on-failure
 RestartSec=3
 
@@ -160,7 +160,7 @@ func uninstallClient() error {
 }
 
 func removeInstalledBin() error {
-	os.Remove(filepath.Dir(clientStatePath)) // /etc/tunel, only if empty
+	os.Remove(filepath.Dir(clientStatePath)) // /etc/rabbithole, only if empty
 	if err := os.Remove(installedBin); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
@@ -239,7 +239,7 @@ func runClientService() error {
 	os.Remove(explicitMark)
 	if !explicit {
 		if _, err := os.Stat(offFlagPath); err == nil {
-			fmt.Fprintln(os.Stderr, "tunel: turned off before; staying off")
+			fmt.Fprintln(os.Stderr, "rabbithole: turned off before; staying off")
 			return nil
 		}
 	}

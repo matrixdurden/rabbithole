@@ -22,7 +22,7 @@ import (
 
 type obj = map[string]any
 
-const tunName = "tunel"
+const tunName = "rabbithole"
 
 // Traffic to these never enters the tunnel: the LAN, link-local, multicast.
 var lanRanges = []string{
@@ -142,7 +142,7 @@ var dpiRule = obj{"protocol": "tls", "action": "route-options", "tls_record_frag
 // record fragment and spoof, only record fragment got through there, and it
 // costs nothing. doh is the DNS over HTTPS server to use (see pickDoH); ""
 // means none answers on this network, and plain DNS is used instead. With a
-// socksPort it opens a local proxy instead (for tests and tunel doctor).
+// socksPort it opens a local proxy instead (for tests and rabbithole doctor).
 func dpiConfig(socksPort int, logPath, doh string) obj {
 	dns := obj{"type": "https", "tag": "doh", "server": doh}
 	if doh == "" {

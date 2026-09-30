@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-// tunel doctor measures what this network does to traffic and says which
+// rabbithole doctor measures what this network does to traffic and says which
 // mode will work. The report is also saved to a file, so it can be read at
 // home when the network in question blocks everything else.
 
@@ -51,7 +51,7 @@ const blockedSite = "discord.com"
 
 func cmdDoctor() error {
 	r := &report{}
-	r.line("tunel doctor %s · %s · %s/%s", version, time.Now().Format("2006-01-02 15:04"), runtime.GOOS, runtime.GOARCH)
+	r.line("rabbithole doctor %s · %s · %s/%s", version, time.Now().Format("2006-01-02 15:04"), runtime.GOOS, runtime.GOARCH)
 
 	// Measure the network itself, not the tunnel: pause it and bring it back after.
 	if serviceExists() && svcRunning() {
@@ -63,7 +63,7 @@ func cmdDoctor() error {
 		}
 		defer func() {
 			if err := svcControl(op); err != nil {
-				bad("could not turn the tunnel back on: %v; run: tunel %s", err, op)
+				bad("could not turn the tunnel back on: %v; run: rabbithole %s", err, op)
 			}
 		}()
 	}
@@ -185,46 +185,46 @@ func cmdDoctor() error {
 	}
 
 	if linked {
-		r.line("\nServer %s:%d (tunel on)", link.Host, link.Port)
+		r.line("\nServer %s:%d (rabbithole on)", link.Host, link.Port)
 		r.check(tcpErr == nil, "reachable", "%s", okOr(shortErrOrNil(tcpErr), fmt.Sprintf("TCP in %dms", tcpTook.Milliseconds())))
 		r.check(realErr == nil, "tunnel handshake", "%s", okOr(shortErrOrNil(realErr), fmt.Sprintf("leaves as %s, %dms", exitIP, realTook.Milliseconds())))
 	}
 
-	r.line("\nA blocked site: %s (tunel dpi)", blockedSite)
+	r.line("\nA blocked site: %s (rabbithole dpi)", blockedSite)
 	if directErr != nil && dnsRewritten {
 		directErr = fmt.Errorf("blocked: the network's DNS sends it to a block page")
 	}
 	r.check(directErr == nil, "direct", "%s", okOr(shortErrOrNil(directErr), fmt.Sprintf("opens, %dms (not blocked here)", directTook.Milliseconds())))
-	r.check(dpiErr == nil, "with tunel dpi", "%s", okOr(shortErrOrNil(dpiErr), fmt.Sprintf("opens, %dms", dpiTook.Milliseconds())))
+	r.check(dpiErr == nil, "with rabbithole dpi", "%s", okOr(shortErrOrNil(dpiErr), fmt.Sprintf("opens, %dms", dpiTook.Milliseconds())))
 
 	if names := conflictingPrograms(); len(names) > 0 {
-		r.line("\n%s⚠ running: %s — close it, it breaks tunel%s", cYellow, strings.Join(names, ", "), cReset)
+		r.line("\n%s⚠ running: %s — close it, it breaks rabbithole%s", cYellow, strings.Join(names, ", "), cReset)
 	}
 
 	r.line("\nVerdict")
 	switch {
 	case portalErr != nil && inetErr != nil:
-		r.line("  Sign in to the Wi-Fi first (open a browser), then run tunel doctor again.")
+		r.line("  Sign in to the Wi-Fi first (open a browser), then run rabbithole doctor again.")
 	case !linked:
-		r.line("  tunel on:  no server link on this computer")
+		r.line("  rabbithole on:  no server link on this computer")
 	case realErr == nil:
-		r.line("  tunel on:  works on this network")
+		r.line("  rabbithole on:  works on this network")
 	case tcpErr != nil:
-		r.line("  tunel on:  the network does not let this computer reach the server at all (%v).", shortErr(tcpErr))
+		r.line("  rabbithole on:  the network does not let this computer reach the server at all (%v).", shortErr(tcpErr))
 		r.line("             A server abroad (a VPS) on port 443 would likely get through.")
 	case inspected:
-		r.line("  tunel on:  the server is reachable, but the network opens HTTPS, which breaks the")
+		r.line("  rabbithole on:  the server is reachable, but the network opens HTTPS, which breaks the")
 		r.line("             disguise. A server name the network leaves alone (a ✓ line above) may work.")
 	default:
-		r.line("  tunel on:  the server is reachable, but the tunnel handshake fails (%v).", shortErr(realErr))
+		r.line("  rabbithole on:  the server is reachable, but the tunnel handshake fails (%v).", shortErr(realErr))
 	}
 	switch {
 	case dpiErr == nil && directErr != nil:
-		r.line("  tunel dpi: works: it opens %s, which is blocked here", blockedSite)
+		r.line("  rabbithole dpi: works: it opens %s, which is blocked here", blockedSite)
 	case dpiErr == nil:
-		r.line("  tunel dpi: works (but %s is not blocked here, so this proves little)", blockedSite)
+		r.line("  rabbithole dpi: works (but %s is not blocked here, so this proves little)", blockedSite)
 	default:
-		r.line("  tunel dpi: does not get past this network's filter (%v)", shortErr(dpiErr))
+		r.line("  rabbithole dpi: does not get past this network's filter (%v)", shortErr(dpiErr))
 	}
 
 	path := saveReport(r.b.String())
@@ -362,7 +362,7 @@ func certName(org []string, cn string) string {
 	return cn
 }
 
-// dpiCheck opens the blocked site the way tunel dpi would.
+// dpiCheck opens the blocked site the way rabbithole dpi would.
 func dpiCheck(doh string) error {
 	port, err := freePort()
 	if err != nil {
@@ -396,7 +396,7 @@ func saveReport(text string) string {
 			break
 		}
 	}
-	path := filepath.Join(dir, "tunel-doctor-"+time.Now().Format("20060102-1504")+".txt")
+	path := filepath.Join(dir, "rabbithole-doctor-"+time.Now().Format("20060102-1504")+".txt")
 	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
 		return ""
 	}

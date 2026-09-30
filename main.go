@@ -1,4 +1,4 @@
-// tunel routes a whole computer through your own server, disguised as ordinary HTTPS.
+// rabbithole routes a whole computer through your own server, disguised as ordinary HTTPS.
 package main
 
 import (
@@ -10,26 +10,26 @@ import (
 
 var version = "dev"
 
-const usageText = `tunel %s
+const usageText = `rabbithole %s
 
 server (Linux):
-  tunel server [PORT]     set up this machine as the server (default port 443)
-  tunel add NAME          add a user and print their link
-  tunel del NAME          remove a user; their link stops working
-  tunel users             list users
-  tunel link NAME         print a user's link again
+  rabbithole server [PORT]     set up this machine as the server (default port 443)
+  rabbithole add NAME          add a user and print their link
+  rabbithole del NAME          remove a user; their link stops working
+  rabbithole users             list users
+  rabbithole link NAME         print a user's link again
 
 client (Windows, Linux):
-  tunel client [LINK]     set up this computer with a link from the server
-  tunel on                send all traffic through the server
-  tunel dpi               no server: your own connection, past DPI blocks
-  tunel off               back to the normal connection
-  tunel autostart on|off  at boot, come back as left (on waits for the server)
-  tunel                   show status
+  rabbithole client [LINK]     set up this computer with a link from the server
+  rabbithole on                send all traffic through the server
+  rabbithole dpi               no server: your own connection, past DPI blocks
+  rabbithole off               back to the normal connection
+  rabbithole autostart on|off  at boot, come back as left (on waits for the server)
+  rabbithole                   show status
 
-  tunel doctor            test this network and say which mode works (report saved)
-  tunel update            install the latest version; keys, users and links stay
-  tunel remove            remove everything tunel added to this computer
+  rabbithole doctor            test this network and say which mode works (report saved)
+  rabbithole update            install the latest version; keys, users and links stay
+  rabbithole remove            remove everything rabbithole added to this computer
 `
 
 func usage() {
@@ -54,10 +54,10 @@ func main() {
 	switch cmd {
 	case "":
 		if ownConsole() {
-			// Double-clicked tunel.exe: set up if needed, then keep the window open.
+			// Double-clicked rabbithole.exe: set up if needed, then keep the window open.
 			if serviceExists() {
 				err = cmdStatus()
-				fmt.Println("\n  In a terminal: tunel on / tunel dpi / tunel off, or tunel remove to uninstall.")
+				fmt.Println("\n  In a terminal: rabbithole on / rabbithole dpi / rabbithole off, or rabbithole remove to uninstall.")
 			} else {
 				err = cmdClient(nil)
 			}
@@ -197,6 +197,8 @@ func runAdmin(args []string) error {
 		return adminRemove()
 	case "upgrade":
 		return adminUpgrade(args)
+	case "adopt":
+		return adminAdopt()
 	case "autostart":
 		return adminAutostart(args)
 	}

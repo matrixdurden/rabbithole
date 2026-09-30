@@ -15,13 +15,13 @@ import (
 )
 
 // A client owns (see sys_*.go for the exact paths): the installed binary, a
-// stopped-by-default system service that runs `tunel service`, the mode it
+// stopped-by-default system service that runs `rabbithole service`, the mode it
 // last ran in, and, once a server link was given, client.json with the link
 // and a marked Host block in the user's ~/.ssh/config.
 //
 // The service runs in one of two modes:
-//   server  all traffic goes through the server (tunel on)
-//   dpi     traffic leaves directly, past DPI blocks, no server (tunel dpi)
+//   server  all traffic goes through the server (rabbithole on)
+//   dpi     traffic leaves directly, past DPI blocks, no server (rabbithole dpi)
 
 const (
 	modeServer = "server"
@@ -53,18 +53,21 @@ func loadClient() (Link, error) {
 	return l, nil
 }
 
-// hasLink reports whether a server link was set up (tunel on works).
+// hasLink reports whether a server link was set up (rabbithole on works).
 func hasLink() bool {
 	_, err := os.Stat(clientStatePath)
 	return err == nil
 }
 
-// ---------- tunel client LINK ----------
+// ---------- rabbithole client LINK ----------
 
 func cmdClient(args []string) error {
 	var raw string
 	switch len(args) {
 	case 0:
+		if !serviceExists() && legacyClientInstalled() {
+			return cmdAdopt()
+		}
 		fmt.Print("Paste the link from your server, or press Enter for DPI bypass only: ")
 		line, err := bufio.NewReader(os.Stdin).ReadString('\n')
 		if err != nil && line == "" {
@@ -77,7 +80,7 @@ func cmdClient(args []string) error {
 	case 1:
 		raw = args[0]
 	default:
-		return fmt.Errorf("usage: tunel client 'vless://…' (quote the link)")
+		return fmt.Errorf("usage: rabbithole client 'vless://…' (quote the link)")
 	}
 	l, err := ParseLink(strings.TrimSpace(raw))
 	if err != nil {
@@ -120,14 +123,14 @@ func adminClientInstall(args []string) error {
 	if err := writeFileAtomic(clientStatePath, append(raw, '\n'), 0o600); err != nil {
 		return err
 	}
-	if err := installClient(); err != nil {
+	if _, err := installClientAdopting(); err != nil {
 		return err
 	}
 	ok("installed %s", installedBin)
 	return svcStart(modeServer)
 }
 
-// ---------- tunel dpi ----------
+// ---------- rabbithole dpi ----------
 
 // cmdDPI sets up the service if needed; no server or link is involved.
 func cmdDPI() error {
@@ -143,7 +146,7 @@ func cmdDPI() error {
 
 func adminDPI() error {
 	if !serviceExists() {
-		if err := installClient(); err != nil {
+		if _, err := installClientAdopting(); err != nil {
 			return err
 		}
 		ok("installed %s", installedBin)
@@ -155,7 +158,7 @@ func adminDPI() error {
 
 func cmdOn() error {
 	if !hasLink() {
-		return fmt.Errorf("no server link yet; run: tunel client 'vless://…'  (or tunel dpi for DPI bypass only)")
+		return fmt.Errorf("no server link yet; run: rabbithole client 'vless://…'  (or rabbithole dpi for DPI bypass only)")
 	}
 	if err := svcControl("on"); err != nil {
 		return err
@@ -195,15 +198,15 @@ func cmdStatus() error {
 			what = "the server; if it does not answer, the tunnel stays off"
 		}
 		fmt.Printf("%s◌%s starting  %swaiting for %s%s\n", cYellow, cReset, cDim, what, cReset)
-		fmt.Printf("%s  tunel off stops waiting%s\n", cDim, cReset)
+		fmt.Printf("%s  rabbithole off stops waiting%s\n", cDim, cReset)
 		return nil
 	}
 	if !svcRunning() {
 		fmt.Printf("%s○%s off\n", cYellow, cReset)
 		if hasLink() {
-			fmt.Printf("%s  tunel on   all traffic through %s%s\n", cDim, l.Host, cReset)
+			fmt.Printf("%s  rabbithole on   all traffic through %s%s\n", cDim, l.Host, cReset)
 		}
-		fmt.Printf("%s  tunel dpi  your own connection, past DPI blocks%s\n", cDim, cReset)
+		fmt.Printf("%s  rabbithole dpi  your own connection, past DPI blocks%s\n", cDim, cReset)
 		autostartHint()
 		return nil
 	}
@@ -230,7 +233,7 @@ func cmdStatus() error {
 	}
 	if err != nil {
 		fmt.Printf("%s●%s on  %sno route to the server%s\n", cYellow, cReset, cYellow, cReset)
-		fmt.Printf("%s  the internet is blocked until the server answers or you run: tunel off%s\n", cDim, cReset)
+		fmt.Printf("%s  the internet is blocked until the server answers or you run: rabbithole off%s\n", cDim, cReset)
 		fmt.Printf("%s  log: %s%s\n", cDim, clientLogHint, cReset)
 		return nil
 	}
@@ -241,35 +244,35 @@ func cmdStatus() error {
 	return nil
 }
 
-// ---------- tunel autostart ----------
+// ---------- rabbithole autostart ----------
 
 // With autostart on, the service starts at boot and picks up where it was
-// left: in the last mode, or not at all after `tunel off`. In server mode it
+// left: in the last mode, or not at all after `rabbithole off`. In server mode it
 // first waits for the server, and stays off if the server does not answer.
 
 func cmdAutostart(args []string) error {
 	if !serviceExists() {
-		return fmt.Errorf("not set up; run: tunel client")
+		return fmt.Errorf("not set up; run: rabbithole client")
 	}
 	if len(args) == 0 {
 		if autostartEnabled() {
-			fmt.Println("autostart on: at boot tunel comes back as you left it")
+			fmt.Println("autostart on: at boot rabbithole comes back as you left it")
 		} else {
-			fmt.Println("autostart off: after a reboot tunel is off until you turn it on")
+			fmt.Println("autostart off: after a reboot rabbithole is off until you turn it on")
 		}
 		return nil
 	}
 	if len(args) != 1 || (args[0] != "on" && args[0] != "off") {
-		return fmt.Errorf("usage: tunel autostart on | off")
+		return fmt.Errorf("usage: rabbithole autostart on | off")
 	}
 	if err := asAdmin("autostart", args[0]); err != nil {
 		return err
 	}
 	if args[0] == "on" {
-		ok("at boot tunel comes back as you left it: on, dpi, or off")
+		ok("at boot rabbithole comes back as you left it: on, dpi, or off")
 		ok("in on mode it first waits for the server; if the server does not answer, it stays off")
 	} else {
-		ok("after a reboot tunel is off until you turn it on")
+		ok("after a reboot rabbithole is off until you turn it on")
 	}
 	return nil
 }
@@ -283,19 +286,19 @@ func adminAutostart(args []string) error {
 
 func autostartHint() {
 	if autostartEnabled() {
-		fmt.Printf("%s  starts at boot as you left it · tunel autostart off%s\n", cDim, cReset)
+		fmt.Printf("%s  starts at boot as you left it · rabbithole autostart off%s\n", cDim, cReset)
 	}
 }
 
 func warnConflicts() {
 	for _, name := range conflictingPrograms() {
 		fmt.Printf("\n%s⚠ %s is running.%s It rewrites outgoing packets, which breaks some\n", cYellow, name, cReset)
-		fmt.Printf("  connections through tunel (TLS 1.2 sites and apps). tunel already gets\n")
+		fmt.Printf("  connections through rabbithole (TLS 1.2 sites and apps). rabbithole already gets\n")
 		fmt.Printf("  around DPI in both modes, so %s is not needed; close it.\n", name)
 	}
 }
 
-// ---------- tunel remove ----------
+// ---------- rabbithole remove ----------
 
 func cmdRemove() error {
 	if err := asAdmin("remove"); err != nil {
@@ -367,9 +370,9 @@ func startTunnel(ctx context.Context, mode, logPath string, patient bool, tick f
 	}
 	logf := func(format string, a ...any) {
 		if logPath != "" {
-			appendLog(logPath, "tunel: "+fmt.Sprintf(format, a...))
+			appendLog(logPath, "rabbithole: "+fmt.Sprintf(format, a...))
 		} else {
-			fmt.Fprintf(os.Stderr, "tunel: "+format+"\n", a...)
+			fmt.Fprintf(os.Stderr, "rabbithole: "+format+"\n", a...)
 		}
 	}
 	deadline := time.Now().Add(90 * time.Second)
@@ -422,7 +425,7 @@ func appendLog(path, line string) {
 
 // ---------- ~/.ssh/config left by older versions ----------
 
-// tunel no longer touches ~/.ssh/config: with the whole computer in the
+// rabbithole no longer touches ~/.ssh/config: with the whole computer in the
 // tunnel, `ssh` to the server's address already goes through it. Versions
 // before v0.1.5 added a marked Host block; setup and remove take it out.
 

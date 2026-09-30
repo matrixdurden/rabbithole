@@ -63,7 +63,7 @@ func ParseLink(s string) (Link, error) {
 		Name:      u.Fragment,
 	}
 	if !nameRe.MatchString(l.Name) {
-		l.Name = "tunel"
+		l.Name = "rabbithole"
 	}
 	switch {
 	case !uuidRe.MatchString(l.UUID):
