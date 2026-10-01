@@ -17,6 +17,10 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/sagernet/sing-box/common/certificate"
+	C "github.com/sagernet/sing-box/constant"
+	"github.com/sagernet/sing-box/option"
 )
 
 // rabbithole doctor measures what this network does to traffic and says which
@@ -149,13 +153,20 @@ func cmdDoctor() error {
 			break
 		}
 	}
-	dnsRewritten := sysErr == nil && len(dohAddrs) > 0 && !overlaps(sysAddrs, dohAddrs)
+	// Without DNS over HTTPS there are no real addresses to compare with, but
+	// the TLS check went to the network's answer: another site there is a block page.
+	blockPage := tlsRes[len(tlsRes)-1].otherSite
+	dnsRewritten := sysErr == nil &&
+		(len(dohAddrs) > 0 && !overlaps(sysAddrs, dohAddrs) || len(dohAddrs) == 0 && blockPage != "")
 	switch {
 	case sysErr != nil:
 		r.check(false, "network DNS", "%s: %v", blockedSite, shortErr(sysErr))
-	case dnsRewritten:
+	case dnsRewritten && len(dohAddrs) > 0:
 		r.check(false, "network DNS", "%s → %s, but really %s: the network rewrites DNS",
 			blockedSite, strings.Join(sysAddrs, " "), strings.Join(dohAddrs, " "))
+	case dnsRewritten:
+		r.check(false, "network DNS", "%s → %s, a block page (its certificate is for %s)",
+			blockedSite, strings.Join(sysAddrs, " "), blockPage)
 	default:
 		r.check(true, "network DNS", "%s → %s", blockedSite, strings.Join(sysAddrs, " "))
 	}
@@ -169,12 +180,21 @@ func cmdDoctor() error {
 	}
 	r.check(dohPick != "", "DNS over HTTPS", "%s", strings.Join(parts, " · "))
 
-	r.line("\nTLS inspection (does the network open HTTPS? checked at the sites' real addresses)")
-	inspected := false
+	if dohPick != "" {
+		r.line("\nTLS inspection (does the network open HTTPS? checked at the sites' real addresses)")
+	} else {
+		r.line("\nTLS inspection (does the network open HTTPS? checked where the network's DNS points)")
+	}
+	inspected, trustedInspector := false, ""
 	for _, t := range tlsRes {
 		if t.inspectedBy != "" {
 			inspected = true
+			if t.trusted {
+				trustedInspector = t.inspectedBy
+			}
 			r.check(false, t.sni, "certificate from %q instead of the site's: the network opens HTTPS here", t.inspectedBy)
+		} else if t.otherSite != "" {
+			r.check(false, t.sni, "the certificate is for %s: a block page", t.otherSite)
 		} else if t.err != nil && t.err.Error() == "connection reset" {
 			r.check(false, t.sni, "connection cut: the network filters this site name (SNI)")
 		} else if t.err != nil {
@@ -182,6 +202,10 @@ func cmdDoctor() error {
 		} else {
 			r.check(true, t.sni, "genuine, issued by %s", t.issuer)
 		}
+	}
+	if trustedInspector != "" {
+		r.line("  %s⚠ this computer trusts %q, so with the tunnel off the network reads HTTPS to sites like these%s",
+			cYellow, trustedInspector, cReset)
 	}
 
 	if linked {
@@ -225,6 +249,12 @@ func cmdDoctor() error {
 		r.line("  rabbithole dpi: works (but %s is not blocked here, so this proves little)", blockedSite)
 	default:
 		r.line("  rabbithole dpi: does not get past this network's filter (%v)", shortErr(dpiErr))
+		if dohPick == "" && dnsRewritten {
+			r.line("             The network blocks DNS over HTTPS, and its own DNS sends blocked sites to a block page.")
+		}
+		if inspected {
+			r.line("             The network opens HTTPS, which splitting handshakes does not get past.")
+		}
 	}
 
 	path := saveReport(r.b.String())
@@ -298,8 +328,21 @@ func captivePortal() (string, error) {
 
 type tlsResult struct {
 	sni, issuer, inspectedBy string
+	trusted                  bool   // this computer trusts inspectedBy
+	otherSite                string // the certificate is another site's: a block page
 	err                      error
 }
+
+// publicRoots are the certificate authorities browsers trust: Mozilla's list,
+// built into sing-box. Checking against them rather than the computer's own
+// list catches inspection by a certificate a school or company installed.
+var publicRoots = sync.OnceValue(func() *x509.CertPool {
+	s, err := certificate.NewStore(context.Background(), nil, option.CertificateOptions{Store: C.CertificateStoreMozilla})
+	if err != nil {
+		return nil
+	}
+	return s.Pool()
+})
 
 // tlsChecks connects to the sites whose names can disguise the tunnel and
 // checks that the certificate is theirs, not the network's.
@@ -325,34 +368,61 @@ func tlsChecks(l Link, doh string) []tlsResult {
 // tlsCheck connects to sni at its real address (from doh when there is one,
 // since the network's DNS may point blocked names at a block page).
 func tlsCheck(sni, doh string) tlsResult {
-	r := tlsResult{sni: sni}
 	addr := sni + ":443"
 	if doh != "" {
 		if ips, err := dohLookup(doh, sni, 6*time.Second); err == nil {
 			addr = net.JoinHostPort(ips[0], "443")
 		}
 	}
+	return tlsCheckAt(sni, addr)
+}
+
+func tlsCheckAt(sni, addr string) tlsResult {
+	r := tlsResult{sni: sni}
 	d := &net.Dialer{Timeout: 6 * time.Second}
-	c, err := tls.DialWithDialer(d, "tcp", addr, &tls.Config{ServerName: sni})
-	if err == nil {
-		st := c.ConnectionState()
-		r.issuer = certName(st.PeerCertificates[0].Issuer.Organization, st.PeerCertificates[0].Issuer.CommonName)
-		c.Close()
+	// Verified below, against publicRoots.
+	c, err := tls.DialWithDialer(d, "tcp", addr, &tls.Config{ServerName: sni, InsecureSkipVerify: true})
+	if err != nil {
+		r.err = shortErr(err)
 		return r
 	}
-	var unknown x509.UnknownAuthorityError
-	if errors.As(err, &unknown) {
-		// Look at what was presented instead.
-		c, err2 := tls.DialWithDialer(d, "tcp", addr, &tls.Config{ServerName: sni, InsecureSkipVerify: true})
-		if err2 == nil {
-			cert := c.ConnectionState().PeerCertificates[0]
-			r.inspectedBy = certName(cert.Issuer.Organization, cert.Issuer.CommonName)
-			c.Close()
-			return r
-		}
+	certs := c.ConnectionState().PeerCertificates
+	c.Close()
+	leaf := certs[0]
+	if leaf.VerifyHostname(sni) != nil {
+		r.otherSite = certSite(leaf)
+		return r
 	}
-	r.err = shortErr(err)
+	opts := x509.VerifyOptions{DNSName: sni, Roots: publicRoots(), Intermediates: x509.NewCertPool()}
+	for _, ic := range certs[1:] {
+		opts.Intermediates.AddCert(ic)
+	}
+	issuer := certName(leaf.Issuer.Organization, leaf.Issuer.CommonName)
+	_, err = leaf.Verify(opts)
+	var unknown x509.UnknownAuthorityError
+	switch {
+	case err == nil:
+		r.issuer = issuer
+	case errors.As(err, &unknown):
+		r.inspectedBy = issuer
+		opts.Roots = nil // this computer's own list
+		_, err = leaf.Verify(opts)
+		r.trusted = err == nil
+	default:
+		r.err = shortErr(err)
+	}
 	return r
+}
+
+// certSite names the site a certificate is for.
+func certSite(c *x509.Certificate) string {
+	switch {
+	case len(c.DNSNames) > 0:
+		return c.DNSNames[0]
+	case c.Subject.CommonName != "":
+		return c.Subject.CommonName
+	}
+	return "another site"
 }
 
 func certName(org []string, cn string) string {

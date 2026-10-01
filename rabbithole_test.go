@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -156,6 +157,33 @@ func TestDPIDirect(t *testing.T) {
 		if _, err := publicIP(hc); err != nil {
 			t.Errorf("TLS max %x: %v", max, err)
 		}
+	}
+}
+
+// TestTLSCheck stands in for an inspecting network (a certificate from an
+// authority browsers do not trust) and for a block page (another site's
+// certificate). httptest's certificate is for example.com, from "Acme Co".
+func TestTLSCheck(t *testing.T) {
+	srv := httptest.NewTLSServer(http.NotFoundHandler())
+	defer srv.Close()
+	addr := srv.Listener.Addr().String()
+
+	r := tlsCheckAt("example.com", addr)
+	if r.inspectedBy != "Acme Co / " || r.trusted || r.err != nil {
+		t.Errorf("inspected: %+v", r)
+	}
+	r = tlsCheckAt("discord.com", addr)
+	if r.otherSite != "example.com" || r.inspectedBy != "" {
+		t.Errorf("block page: %+v", r)
+	}
+	if publicRoots() == nil {
+		t.Fatal("no public roots")
+	}
+	if testing.Short() {
+		return
+	}
+	if r := tlsCheck("dl.google.com", ""); r.issuer == "" {
+		t.Errorf("genuine: %+v", r)
 	}
 }
 
