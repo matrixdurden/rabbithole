@@ -471,7 +471,7 @@ func printLink(l Link) {
 	fmt.Printf("  %sWindows%s  in PowerShell, then paste the link when asked:\n", cBold, cReset)
 	fmt.Printf("           irm %s/install.ps1 | iex\n\n", scripts)
 	fmt.Printf("  %sLinux%s    curl -fsSL %s/install.sh | sh -s -- client '%s'\n\n", cBold, cReset, scripts, l)
-	fmt.Printf("  %sPhone%s    Hiddify and v2rayNG take the link as it is; for the sing-box app:\n", cBold, cReset)
+	fmt.Printf("  %sPhone%s    a QR code for Hiddify and v2rayNG, and a profile for the sing-box app:\n", cBold, cReset)
 	fmt.Printf("           rabbithole phone '%s'\n\n", l)
 }
 

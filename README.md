@@ -69,9 +69,9 @@ Phones run both modes in the official [sing-box](https://sing-box.sagernet.org/c
 | **on** | `rabbithole phone` on a computer that has a link, or `rabbithole phone 'vless://…'` anywhere, puts a `.bpf` file on the desktop. Send it to the phone and open it with sing-box. |
 
 > [!CAUTION]
-> The `.bpf` file holds the key to the server, so send it only to yourself.
+> The `.bpf` file and the QR code hold the key to the server, so send the file only to yourself and show the code only to your own phone.
 
-Hiddify and v2rayNG take the `vless://` link as it is, too.
+Hiddify and v2rayNG take the `vless://` link as it is, too: `rabbithole phone` also shows it as a QR code to scan with the app's own scanner.
 
 ## Use
 
@@ -104,7 +104,7 @@ sudo rabbithole users
 sudo rabbithole link ali    # prints ali's link again
 ```
 
-The link is a standard `vless://` link, so phone apps such as Hiddify or v2rayNG accept it too; for the sing-box app see [Phones](#3-phones).
+The link is a standard `vless://` link, so phone apps such as Hiddify or v2rayNG accept it too; `rabbithole phone` shows it as a QR code for them. See [Phones](#3-phones).
 
 ## Update
 

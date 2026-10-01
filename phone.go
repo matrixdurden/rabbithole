@@ -152,10 +152,14 @@ func cmdPhone(args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("  %son%s   through %s. The profile is in:\n\n", cBold, cReset, l.Host)
+	fmt.Printf("  %son%s   through %s. In sing-box, open this file on the phone (send it there):\n\n", cBold, cReset, l.Host)
 	fmt.Printf("       %s\n\n", path)
-	fmt.Printf("       Send the file to the phone and open it with sing-box.\n")
-	fmt.Printf("       %sIt holds the key to the server: send it only to yourself, then delete it.%s\n\n", cYellow, cReset)
+	fmt.Printf("       or in Hiddify or v2rayNG, scan this with the app's own QR scanner:\n\n")
+	if !printQR(l.String()) {
+		fmt.Printf("       %s\n", l)
+	}
+	fmt.Printf("\n       %sBoth hold the key to the server: show the code only to your own phone,\n", cYellow)
+	fmt.Printf("       send the file only to yourself, then delete it.%s\n\n", cReset)
 	return nil
 }
 
